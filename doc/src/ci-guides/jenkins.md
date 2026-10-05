@@ -26,8 +26,10 @@ pipeline {
                 sh '''
                     CACHE_PATH=/var/lib/btdt/cache  # Path to cache on the Jenkins agent
                     CACHE_KEY=cache-key-$(btdt hash package-lock.json)
+                    set +e  # Jenkins runs sh with -e, but a cache miss exits non-zero
                     btdt restore --cache "$CACHE_PATH" --keys $CACHE_KEY node_modules
                     RESTORE_EXIT_CODE=$?
+                    set -e
                     if [ $RESTORE_EXIT_CODE -ne 0 ]; then
                         npm ci  # Install dependencies
                         btdt store --cache "$CACHE_PATH" --keys $CACHE_KEY node_modules
@@ -104,12 +106,14 @@ pipeline {
                         sh '''
                             CACHE_URL=http://btdt.example.com:8707/api/caches/my-cache
                             CACHE_KEY=cache-key-$(btdt hash package-lock.json)
+                            set +e  # Jenkins runs sh with -e, but a cache miss exits non-zero
                             btdt restore \\
                               --cache "$CACHE_URL" \\
                               --auth-token-file "$BTDT_AUTH_TOKEN_FILE" \\
                               --keys $CACHE_KEY \\
                               node_modules
                             RESTORE_EXIT_CODE=$?
+                            set -e
                             if [ $RESTORE_EXIT_CODE -ne 0 ]; then
                                 npm ci  # Install dependencies
                                 btdt store \\
