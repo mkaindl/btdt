@@ -72,6 +72,11 @@ fi
 This will store the latest cached dependencies also under the key `fallback`. This cache entry will be used, if no more
 specific cache enry is found.
 
+> [!WARNING]
+> Only use fallback keys if the command that runs after the restore also removes files that are no longer needed.
+> Otherwise, each store adds the new files to all the files restored from the fallback key, and the cache entry keeps
+> growing with every change of the primary key.
+
 ## Using a remote cache
 
 Instead of using a local filesystem path for the cache, you can also use a remote cache server.
