@@ -48,7 +48,7 @@ pipeline {
 
 To prevent the local cache from growing indefinitely, you can set up a periodic cleanup job in Jenkins.
 For each agent, create a new Jenkins pipeline job that runs periodically (e.g., daily or weekly)
-and add a stage that runs the `btdt cleanup` command on the cache path.
+and add a stage that runs the `btdt clean` command on the cache path.
 For example:
 
 ```groovy
@@ -65,7 +65,7 @@ pipeline {
             steps {
                 sh '''
                     CACHE_PATH=/var/lib/btdt/cache  # Path to cache on the Jenkins agent
-                    btdt cleanup --cache "$CACHE_PATH" --max-age 7d --max-size 10G
+                    btdt clean --cache "$CACHE_PATH" --max-age 7d --max-size 10G
                 '''
             }
         }
