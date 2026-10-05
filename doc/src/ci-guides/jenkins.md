@@ -9,7 +9,7 @@ or a remote cache using a `btdt-server` instance.
 
 For an agent-local setup, you only need to [install the `btdt` CLI](../install.md) on your Jenkins agents.
 Then you can integrate `btdt` commands into your pipeline script as described
-in [Getting Started](../getting_started.md).
+in [Getting Started](../getting-started.md).
 Ensure that the cache path you use is writable by the Jenkins agent user.
 
 An example `Jenkinsfile` could look like this:
@@ -85,7 +85,7 @@ and [an authorization token generated](../btdt-server/authorization.md).
 Provide the authorization token as "secret file" credential in Jenkins ("Manage Jenkins" → "Credentials").
 
 Then you can integrate `btdt` commands into your pipeline script as described
-in [Getting Started](../getting_started.md),
+in [Getting Started](../getting-started.md),
 using the remote cache URL and an authentication token file provided from the Jenkins credential.
 
 An example `Jenkinsfile` could look like this:
