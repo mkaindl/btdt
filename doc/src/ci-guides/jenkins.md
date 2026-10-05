@@ -126,10 +126,10 @@ pipeline {
                     }
                 }
             }
-            stage('Run tests') {
-                steps {
-                    // ...
-                }
+        }
+        stage('Run tests') {
+            steps {
+                // ...
             }
         }
     }
