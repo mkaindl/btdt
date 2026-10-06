@@ -104,7 +104,7 @@ pipeline {
                             file(credentialsId: 'btdt-auth-token', variable: 'BTDT_AUTH_TOKEN_FILE'),
                     ]) {
                         sh '''
-                            CACHE_URL=http://btdt.example.com:8707/api/caches/my-cache
+                            CACHE_URL=https://btdt.example.com:8707/api/caches/my-cache
                             CACHE_KEY=cache-key-$(btdt hash package-lock.json)
                             set +e  # Jenkins runs sh with -e, but a cache miss exits non-zero
                             btdt restore \\
