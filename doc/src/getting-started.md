@@ -54,15 +54,18 @@ You can specify multiple cache keys. This allows to have a fallback mechanism. T
 during the restore operation and allow you to use a cache which might not contain the exact dependencies required, but
 could still speed up the installation if most of them are contained.
 
-With `npm` the usage of multiple cache keys could look like this:
+A fallback only pays off if the installation reuses the restored files, removes the ones that are no longer needed,
+and still fails on an outdated lock file.
+
+With `pnpm`, the usage of multiple cache keys could look like this:
 
 ```sh
-CACHE_KEY=cache-key-$(btdt hash package-lock.json)
+CACHE_KEY=cache-key-$(btdt hash pnpm-lock.yaml)
 
 btdt restore --cache path/to/cache --keys "$CACHE_KEY,fallback" node_modules
 RESTORE_EXIT_CODE=$?
 
-npm ci
+pnpm install --frozen-lockfile
 
 if [ $RESTORE_EXIT_CODE -ne 0 ]; then
     btdt store --cache path/to/cache --keys $CACHE_KEY,fallback node_modules
