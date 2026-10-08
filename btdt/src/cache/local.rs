@@ -17,6 +17,10 @@ use std::io::{ErrorKind, Read, Write};
 use std::ops::Deref;
 use std::pin::Pin;
 
+/// A blob is written before the meta files referencing it. Unreferenced blobs younger than this
+/// are kept because their meta files might still be in the process of being written.
+const UNREFERENCED_BLOB_GRACE_PERIOD: TimeDelta = TimeDelta::hours(1);
+
 /// A local cache that stores data in a storage backend.
 ///
 /// Note that the storage backend itself could store data remotely, despite the cache being
@@ -165,14 +169,14 @@ impl<S: Storage, C: Clock, R: RngBytes> LocalCache<S, C, R> {
             return Ok(());
         }
 
-        let mut blob_sizes = HashMap::new();
+        let mut blob_files = HashMap::new();
         for blob in Self::iter_subdir_files(&self.storage, "/blob")? {
             let blob = blob?;
             if let Ok(blob_id) = ICASE_NOPAD_ALPHANUMERIC_ENCODING
                 .decode(format!("{}{}", blob.subdir, blob.name).as_bytes())
             {
                 let blob_id: BlobId = blob_id.try_into().unwrap();
-                blob_sizes.insert(blob_id, blob.size);
+                blob_files.insert(blob_id, blob);
             }
         }
 
@@ -191,15 +195,26 @@ impl<S: Storage, C: Clock, R: RngBytes> LocalCache<S, C, R> {
             let latest_access = meta.latest_access().map_err(|err| {
                 IoPathError::new_no_path(io::Error::new(ErrorKind::InvalidData, format!("{err:?}")))
             })?;
-            if let Some(&size) = blob_sizes.get(meta.blob_id()) {
+            if let Some(blob_file) = blob_files.get(meta.blob_id()) {
                 let entry = blobs.entry(*meta.blob_id()).or_insert_with(|| Blob {
                     latest_access: Reverse(latest_access),
-                    size,
+                    size: blob_file.size,
                     blob_id: *meta.blob_id(),
                     keys: vec![],
                 });
                 entry.keys.push(key_file.name.to_string());
                 entry.latest_access = Reverse(std::cmp::max(entry.latest_access.0, latest_access));
+            }
+        }
+
+        let unreferenced_cutoff = self.clock.now() - UNREFERENCED_BLOB_GRACE_PERIOD;
+        for (blob_id, blob_file) in &blob_files {
+            if !blobs.contains_key(blob_id)
+                && blob_file
+                    .modified
+                    .is_some_and(|modified| modified < unreferenced_cutoff)
+            {
+                self.storage.delete(&blob_file.path)?;
             }
         }
 
@@ -267,6 +282,7 @@ impl<S: Storage, C: Clock, R: RngBytes> LocalCache<S, C, R> {
                                 subdir: path_entry.name.to_string(),
                                 name: subdir_entry.name.to_string(),
                                 size: subdir_entry.size,
+                                modified: subdir_entry.modified,
                             }))
                         }
                         Err(err) => Some(Err(err)),
@@ -284,6 +300,7 @@ struct SubdirFile {
     subdir: String,
     name: String,
     size: u64,
+    modified: Option<DateTime<Utc>>,
 }
 
 /// A writer for a cache entry.
@@ -472,6 +489,39 @@ mod tests {
         );
         assert_cache_entry_with_content(&cache, &["1-day-old"], "1-day-old", "0123456789");
         assert_cache_entry_with_content(&cache, &["0-days-old"], "0-days-old", "0123456789");
+
+        let storage = cache.into_storage();
+        assert_blob_count(&storage, 2);
+    }
+
+    #[test]
+    fn test_clean_removes_unreferenced_blobs() {
+        let mut clock = ControlledClock::new(Utc::now());
+        let storage = InMemoryStorage::new();
+        let mut cache = LocalCache::with_clock(storage, clock.clone());
+
+        cache_entry_with_content(&mut cache, &["key"], "old content").unwrap();
+        cache_entry_with_content(&mut cache, &["key"], "new content").unwrap();
+        clock.advance_by(TimeDelta::hours(2));
+
+        cache.clean(Some(TimeDelta::days(1)), None).unwrap();
+
+        assert_cache_entry_with_content(&cache, &["key"], "key", "new content");
+        let storage = cache.into_storage();
+        assert_blob_count(&storage, 1);
+    }
+
+    #[test]
+    fn test_clean_keeps_recently_written_unreferenced_blobs() {
+        let mut clock = ControlledClock::new(Utc::now());
+        let storage = InMemoryStorage::new();
+        let mut cache = LocalCache::with_clock(storage, clock.clone());
+
+        cache_entry_with_content(&mut cache, &["key"], "old content").unwrap();
+        cache_entry_with_content(&mut cache, &["key"], "new content").unwrap();
+        clock.advance_by(TimeDelta::minutes(30));
+
+        cache.clean(Some(TimeDelta::days(1)), None).unwrap();
 
         let storage = cache.into_storage();
         assert_blob_count(&storage, 2);
