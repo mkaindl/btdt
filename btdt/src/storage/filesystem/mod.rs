@@ -177,14 +177,18 @@ fn storage_entry(entry: &DirEntry) -> io::Result<Option<StorageEntry<'static>>> 
         .file_name()
         .into_string()
         .map_err(|_| io::Error::new(ErrorKind::InvalidData, "File name is not valid Unicode"))?;
-    let size = match entry_type {
-        EntryType::File => entry.metadata()?.len(),
-        EntryType::Directory => 0,
+    let (size, modified) = match entry_type {
+        EntryType::File => {
+            let metadata = entry.metadata()?;
+            (metadata.len(), Some(metadata.modified()?.into()))
+        }
+        EntryType::Directory => (0, None),
     };
     Ok(Some(StorageEntry {
         entry_type,
         name: Cow::Owned(name),
         size,
+        modified,
     }))
 }
 
